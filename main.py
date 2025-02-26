@@ -131,6 +131,20 @@ def main():
     application.add_handler(CallbackQueryHandler(button_click))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     application.run_polling()
+from flask import Flask
+import threading
 
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Бот работает!"
+
+def run_flask():
+    app.run(host="0.0.0.0", port=10000)
+
+if __name__ == '__main__':
+    threading.Thread(target=run_flask).start()
+    main()
 if __name__ == '__main__':
     main()
