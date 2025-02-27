@@ -6,11 +6,11 @@ from flask import Flask
 import threading
 
 # Токен Telegram-бота
-TELEGRAM_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
+TELEGRAM_TOKEN = "7649909820:AAG_ofyeA__Q6iLHWl1WQaFuiS6iaUhxW3Q"
 
 # Настройка OpenAI через AITUNNEL
 client = OpenAI(
-    api_key="YOUR_OPENAI_API_KEY",
+    api_key="sk-aitunnel-ynPRiPL0SFNxo2Gm1YkgWbjGsxVIdgEy",
     base_url="https://api.aitunnel.ru/v1/",
 )
 
