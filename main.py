@@ -18,31 +18,6 @@ client = OpenAI(
 # Словарь для хранения состояний пользователей
 user_states = {}
 
-# Главное меню
-async def show_main_menu(update: Update):
-    keyboard = [
-        [InlineKeyboardButton("📊 Математические задачи", callback_data='math')],
-        [InlineKeyboardButton("🖼 Сгенерировать изображение", callback_data='image')],
-        [InlineKeyboardButton("🔊 Сгенерировать речь (TTS)", callback_data='speech')],
-        [InlineKeyboardButton("❓ Другое", callback_data='other')]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text(
-        "Привет! Я бот, который может:\n\n✅ Решать математические задачи\n✅ Генерировать изображения\n✅ Преобразовывать текст в речь\n✅ Отвечать на вопросы\n\nВыберите действие:",
-        reply_markup=reply_markup
-    )
-
-# Функция для обработки кнопки "Назад"
-async def back_to_main(update: Update, context: CallbackContext):
-    query = update.callback_query
-    await query.answer()
-    user_states[query.from_user.id] = "menu"
-    await show_main_menu(query)
-
-# Обработчик команды /start
-async def start_command(update: Update, context: CallbackContext):
-    await show_main_menu(update)
-
 # Функция для решения математических задач
 def solve_math_problem(problem: str):
     try:
@@ -53,48 +28,49 @@ def solve_math_problem(problem: str):
     except Exception as e:
         return f"Произошла ошибка: {e}"
 
+# Обработчик команды /start
+async def start_command(update: Update, context: CallbackContext):
+    keyboard = [
+        [InlineKeyboardButton("📊 Математические задачи", callback_data='math')],
+        [InlineKeyboardButton("🖼 Сгенерировать изображение", callback_data='image')],
+        [InlineKeyboardButton("🔊 Сгенерировать речь (TTS)", callback_data='speech')],
+        [InlineKeyboardButton("❓ Другое", callback_data='other')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text(
+        "Привет! Я бот, который может решать математические задачи, генерировать изображения, синтезировать речь и отвечать на вопросы.\n\nВыберите действие:",
+        reply_markup=reply_markup
+    )
+
 # Обработчик кнопок
 async def button_click(update: Update, context: CallbackContext):
     query = update.callback_query
     user_id = query.from_user.id
     await query.answer()
 
-    back_button = [[InlineKeyboardButton("🔙 Назад", callback_data='back')]]
-
     if query.data == "math":
         user_states[user_id] = "math"
-        reply_markup = InlineKeyboardMarkup(back_button)
         await query.message.reply_text(
-            "🔢 *Вы выбрали режим математических задач.*\n\nВведите выражение, например: `2+2*3` или `sqrt(16)`.",
-            reply_markup=reply_markup
+            "🔢 Вы выбрали режим *математических задач*.\n\nВведите математическое выражение, например: `2+2*3` или `sqrt(16)`."
         )
 
     elif query.data == "image":
         user_states[user_id] = "image"
-        reply_markup = InlineKeyboardMarkup(back_button)
         await query.message.reply_text(
-            "🖼 *Вы выбрали генерацию изображения.*\n\nВведите описание картинки, например: `космический корабль, летающий над Марсом`.",
-            reply_markup=reply_markup
+            "🖼 Вы выбрали *генерацию изображения*.\n\nВведите описание картинки, например: `космический корабль, летающий над Марсом`."
         )
 
     elif query.data == "speech":
         user_states[user_id] = "speech"
-        reply_markup = InlineKeyboardMarkup(back_button)
         await query.message.reply_text(
-            "🔊 *Вы выбрали генерацию речи (TTS).*\n\nВведите текст, который хотите преобразовать в голосовое сообщение.",
-            reply_markup=reply_markup
+            "🔊 Вы выбрали *генерацию речи (TTS)*.\n\nВведите текст, который хотите преобразовать в голосовое сообщение."
         )
 
     elif query.data == "other":
         user_states[user_id] = "other"
-        reply_markup = InlineKeyboardMarkup(back_button)
         await query.message.reply_text(
-            "❓ *Вы выбрали общение с ИИ.*\n\nЗадайте мне любой вопрос, и я постараюсь ответить!",
-            reply_markup=reply_markup
+            "❓ Вы выбрали *общение с ИИ*.\n\nЗадайте мне любой вопрос, и я постараюсь ответить!"
         )
-
-    elif query.data == "back":
-        await back_to_main(query, context)
 
 # Обработчик текстовых сообщений
 async def handle_message(update: Update, context: CallbackContext):
