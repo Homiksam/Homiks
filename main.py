@@ -52,6 +52,8 @@ async def button_click(update: Update, context: CallbackContext):
     user_id = query.from_user.id
 
     if query.data == "math":
+        await query.message.reply_text("В этом режиме вы можете решить математические задачи. Выберите числа и операции для составления выражения, затем нажмите 'Рассчитать' для получения результата.")
+        
         keyboard = [
             [InlineKeyboardButton("7", callback_data='7'), InlineKeyboardButton("8", callback_data='8'), InlineKeyboardButton("9", callback_data='9')],
             [InlineKeyboardButton("4", callback_data='4'), InlineKeyboardButton("5", callback_data='5'), InlineKeyboardButton("6", callback_data='6')],
@@ -66,9 +68,11 @@ async def button_click(update: Update, context: CallbackContext):
         await query.message.reply_text("Составьте выражение с помощью кнопок:", reply_markup=reply_markup)
 
     elif query.data == "image":
-        await query.message.reply_text("Введите описание изображения, которое хотите сгенерировать:")
+        await query.message.reply_text("Введите описание изображения, которое хотите сгенерировать. Бот создаст изображение на основе вашего описания.")
 
     elif query.data == "tts":
+        await query.message.reply_text("Для преобразования текста в речь введите текст, который вы хотите услышать. Бот озвучит ваш текст.")
+
         await generate_speech(query.message, context)
 
     elif query.data == "other":
