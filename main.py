@@ -32,77 +32,59 @@ async def start_command(update: Update, context: CallbackContext):
     keyboard = [
         [InlineKeyboardButton("Математические задачи", callback_data='math')],
         [InlineKeyboardButton("Сгенерировать изображение", callback_data='image')],
+        [InlineKeyboardButton("Сгенерировать речь (TTS)", callback_data='speech')],
         [InlineKeyboardButton("Другое", callback_data='other')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("Привет! Я бот, который может решать задачи, отвечать на вопросы и генерировать изображения. Выберите действие:", reply_markup=reply_markup)
+    await update.message.reply_text(
+        "Привет! Я бот, который может решать задачи, отвечать на вопросы, генерировать изображения и синтезировать речь.\n\nВыберите действие:",
+        reply_markup=reply_markup
+    )
 
-# Обработчик нажатий на кнопки
+# Обработчик кнопок
 async def button_click(update: Update, context: CallbackContext):
     query = update.callback_query
     await query.answer()
-    user_id = query.from_user.id
 
     if query.data == "math":
-        keyboard = [
-            [InlineKeyboardButton("7", callback_data='7'), InlineKeyboardButton("8", callback_data='8'), InlineKeyboardButton("9", callback_data='9')],
-            [InlineKeyboardButton("4", callback_data='4'), InlineKeyboardButton("5", callback_data='5'), InlineKeyboardButton("6", callback_data='6')],
-            [InlineKeyboardButton("1", callback_data='1'), InlineKeyboardButton("2", callback_data='2'), InlineKeyboardButton("3", callback_data='3')],
-            [InlineKeyboardButton("0", callback_data='0'), InlineKeyboardButton("+", callback_data='+'), InlineKeyboardButton("-", callback_data='-')],
-            [InlineKeyboardButton("*", callback_data='*'), InlineKeyboardButton("/", callback_data='/')],
-            [InlineKeyboardButton("=", callback_data='solve'), InlineKeyboardButton("Очистить", callback_data='clear')],
-            [InlineKeyboardButton("Вычислить корень", callback_data='sqrt')]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        user_expressions[user_id] = ""
-        await query.message.reply_text("Составьте выражение с помощью кнопок:", reply_markup=reply_markup)
-    
+        await query.message.reply_text("Введите математическое выражение.")
+
     elif query.data == "image":
         await query.message.reply_text("Введите описание изображения, которое хотите сгенерировать.")
 
+    elif query.data == "speech":
+        await query.message.reply_text("Введите текст, который хотите преобразовать в голосовое сообщение.")
+
     elif query.data == "other":
         await query.message.reply_text("Задайте мне любой вопрос, и я постараюсь ответить!")
-    
-    elif query.data == "sqrt":
-        await query.message.reply_text("Пожалуйста, введите число, для которого нужно вычислить корень:")
-
-    else:
-        user_expression = user_expressions.get(user_id, "")
-        if query.data == "solve":
-            answer = solve_math_problem(user_expression)
-            await query.message.reply_text(f"Результат: {answer}")
-            user_expressions[user_id] = ""
-        elif query.data == "clear":
-            user_expressions[user_id] = ""
-            await query.message.reply_text("Выражение очищено. Начните заново.")
-        else:
-            user_expressions[user_id] += query.data
-        await query.message.edit_text(f"Текущее выражение: {user_expressions[user_id]}", reply_markup=query.message.reply_markup)
 
 # Обработчик текстовых сообщений
 async def handle_message(update: Update, context: CallbackContext):
     user_message = update.message.text
 
-    if user_message.lower() in ["привет", "здравствуй", "добрый день", "добрый вечер", "хай"]:
-        await start_command(update, context)
-        return
-
-    try:
-        number = float(user_message)
-        sqrt_result = sp.sqrt(number)
-        result_str = str(sp.N(sqrt_result)).rstrip('0').rstrip('.') if '.' in str(sp.N(sqrt_result)) else str(sp.N(sqrt_result))
-        await update.message.reply_text(f"Корень числа {number} равен: {result_str}")
-        return
-    except ValueError:
-        pass
-
+    # Проверка на математические выражения
     if any(char in user_message for char in ['+', '-', '*', '/', '^', '(', ')', '=', 'x', 'y', 'z']):
         answer = solve_math_problem(user_message)
-        if answer:
-            await update.message.reply_text(f"🔢 {answer}")
-            return
+        await update.message.reply_text(f"🔢 {answer}")
+        return
 
-    if len(user_message) > 10:  # Если сообщение длинное, предполагаем, что это запрос на изображение
+    # Генерация речи (TTS), если пользователь запросил
+    if user_message.lower().startswith("скажи ") or len(user_message) < 100:
+        try:
+            response = client.audio.speech.create(
+                model="tts-1",
+                input=user_message,
+                voice="alloy"
+            )
+            with open("speech.mp3", "wb") as file:
+                file.write(response.content)
+            await update.message.reply_voice(voice=open("speech.mp3", "rb"))
+        except Exception as e:
+            await update.message.reply_text(f"Ошибка при генерации речи: {e}")
+        return
+
+    # Генерация изображения, если введен длинный текст (предполагаем, что это описание)
+    if len(user_message) > 10:
         try:
             image_res = client.images.generate(
                 model="dall-e-3",
@@ -117,6 +99,7 @@ async def handle_message(update: Update, context: CallbackContext):
             await update.message.reply_text(f"Ошибка при генерации изображения: {e}")
             return
 
+    # Генерация текстового ответа от ИИ
     try:
         completion = client.chat.completions.create(
             messages=[{"role": "user", "content": user_message}],
@@ -126,13 +109,13 @@ async def handle_message(update: Update, context: CallbackContext):
         bot_response = completion.choices[0].message.content
     except Exception as e:
         bot_response = f"Произошла ошибка: {e}"
-    
+
     await update.message.reply_text(bot_response)
 
 # Запуск бота
 def main():
     application = Application.builder().token(TELEGRAM_TOKEN).build()
-    application.add_handler(CommandHandler("start", start_command))  # Добавлен обработчик /start
+    application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CallbackQueryHandler(button_click))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     application.run_polling()
@@ -150,4 +133,3 @@ def run_flask():
 if __name__ == '__main__':
     threading.Thread(target=run_flask).start()
     main()
-    main()  # Дублирующий вызов оставлен по твоему запросу
