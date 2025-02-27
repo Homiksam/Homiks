@@ -2,20 +2,46 @@ import sympy as sp
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, CallbackContext
 from openai import OpenAI
-import threading
 from flask import Flask
+import threading
+import os
 
 # Токен Telegram-бота
 TELEGRAM_TOKEN = "7649909820:AAG_ofyeA__Q6iLHWl1WQaFuiS6iaUhxW3Q"
 
 # Настройка OpenAI через AITUNNEL
 client = OpenAI(
-    api_key="sk-aitunnel-ynPRiPL0SFNxo2Gm1YkgWbjGsxVIdgEy",  # Подставьте ваш API-ключ
+    api_key="sk-aitunnel-ynPRiPL0SFNxo2Gm1YkgWbjGsxVIdgEy",  # Ключ из нашего сервиса
     base_url="https://api.aitunnel.ru/v1/",
 )
 
-# Словарь для хранения выражений пользователей
-user_expressions = {}
+# Словарь для хранения состояний пользователей
+user_states = {}
+
+# Главное меню
+async def show_main_menu(update: Update):
+    keyboard = [
+        [InlineKeyboardButton("📊 Математические задачи", callback_data='math')],
+        [InlineKeyboardButton("🖼 Сгенерировать изображение", callback_data='image')],
+        [InlineKeyboardButton("🔊 Сгенерировать речь (TTS)", callback_data='speech')],
+        [InlineKeyboardButton("❓ Другое", callback_data='other')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text(
+        "Привет! Я бот, который может:\n\n✅ Решать математические задачи\n✅ Генерировать изображения\n✅ Преобразовывать текст в речь\n✅ Отвечать на вопросы\n\nВыберите действие:",
+        reply_markup=reply_markup
+    )
+
+# Функция для обработки кнопки "Назад"
+async def back_to_main(update: Update, context: CallbackContext):
+    query = update.callback_query
+    await query.answer()
+    user_states[query.from_user.id] = "menu"
+    await show_main_menu(query)
+
+# Обработчик команды /start
+async def start_command(update: Update, context: CallbackContext):
+    await show_main_menu(update)
 
 # Функция для решения математических задач
 def solve_math_problem(problem: str):
@@ -25,115 +51,107 @@ def solve_math_problem(problem: str):
         result_str = str(int(result)) if result == int(result) else str(result).rstrip('0').rstrip('.')
         return f"Результат: {result_str}"
     except Exception as e:
-        return f"Ошибка: {e}"
+        return f"Произошла ошибка: {e}"
 
-# Функция для генерации речи
-async def generate_speech(update: Update, context: CallbackContext):
-    user_id = update.message.from_user.id
-    context.user_data['awaiting_tts'] = True
-    await update.message.reply_text("Введите текст, который хотите преобразовать в речь:")
-
-# Обработчик команды /start
-async def start_command(update: Update, context: CallbackContext):
-    keyboard = [
-        [InlineKeyboardButton("📊 Математические задачи", callback_data='math'),
-         InlineKeyboardButton("🖼 Сгенерировать изображение", callback_data='image')],
-        [InlineKeyboardButton("🔊 Сгенерировать речь (TTS)", callback_data='tts'),
-         InlineKeyboardButton("❓ Другое", callback_data='other')],
-        [InlineKeyboardButton("🔄 Перезапустить бота", callback_data='restart')]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("✅ Бот запущен! Выберите действие:", reply_markup=reply_markup)
-
-# Обработчик нажатий на кнопки
+# Обработчик кнопок
 async def button_click(update: Update, context: CallbackContext):
     query = update.callback_query
-    await query.answer()
     user_id = query.from_user.id
+    await query.answer()
+
+    back_button = [[InlineKeyboardButton("🔙 Назад", callback_data='back')]]
 
     if query.data == "math":
-        await query.message.reply_text("В этом режиме вы можете решить математические задачи. Выберите числа и операции для составления выражения, затем нажмите 'Рассчитать' для получения результата.")
-        
-        keyboard = [
-            [InlineKeyboardButton("7", callback_data='7'), InlineKeyboardButton("8", callback_data='8'), InlineKeyboardButton("9", callback_data='9')],
-            [InlineKeyboardButton("4", callback_data='4'), InlineKeyboardButton("5", callback_data='5'), InlineKeyboardButton("6", callback_data='6')],
-            [InlineKeyboardButton("1", callback_data='1'), InlineKeyboardButton("2", callback_data='2'), InlineKeyboardButton("3", callback_data='3')],
-            [InlineKeyboardButton("0", callback_data='0'), InlineKeyboardButton("+", callback_data='+'), InlineKeyboardButton("-", callback_data='-')],
-            [InlineKeyboardButton("*", callback_data='*'), InlineKeyboardButton("/", callback_data='/')],
-            [InlineKeyboardButton("🟢 = (Рассчитать)", callback_data='solve')],
-            [InlineKeyboardButton("Очистить", callback_data='clear'), InlineKeyboardButton("↩️ Назад", callback_data='back')]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        user_expressions[user_id] = ""
-        await query.message.reply_text("Составьте выражение с помощью кнопок:", reply_markup=reply_markup)
+        user_states[user_id] = "math"
+        reply_markup = InlineKeyboardMarkup(back_button)
+        await query.message.reply_text(
+            "🔢 *Вы выбрали режим математических задач.*\n\nВведите выражение, например: `2+2*3` или `sqrt(16)`.",
+            reply_markup=reply_markup
+        )
 
     elif query.data == "image":
-        await query.message.reply_text("Введите описание изображения, которое хотите сгенерировать. Бот создаст изображение на основе вашего описания.")
+        user_states[user_id] = "image"
+        reply_markup = InlineKeyboardMarkup(back_button)
+        await query.message.reply_text(
+            "🖼 *Вы выбрали генерацию изображения.*\n\nВведите описание картинки, например: `космический корабль, летающий над Марсом`.",
+            reply_markup=reply_markup
+        )
 
-    elif query.data == "tts":
-        await query.message.reply_text("Для преобразования текста в речь введите текст, который вы хотите услышать. Бот озвучит ваш текст.")
-
-        await generate_speech(query.message, context)
+    elif query.data == "speech":
+        user_states[user_id] = "speech"
+        reply_markup = InlineKeyboardMarkup(back_button)
+        await query.message.reply_text(
+            "🔊 *Вы выбрали генерацию речи (TTS).*\n\nВведите текст, который хотите преобразовать в голосовое сообщение.",
+            reply_markup=reply_markup
+        )
 
     elif query.data == "other":
-        await query.message.reply_text("Задайте мне любой вопрос, и я постараюсь ответить!")
-
-    elif query.data == "solve":
-        answer = solve_math_problem(user_expressions.get(user_id, ""))
-        await query.message.reply_text(f"Результат: {answer}")
-        user_expressions[user_id] = ""
-
-    elif query.data == "clear":
-        user_expressions[user_id] = ""
-        await query.message.reply_text("Выражение очищено. Начните заново.")
+        user_states[user_id] = "other"
+        reply_markup = InlineKeyboardMarkup(back_button)
+        await query.message.reply_text(
+            "❓ *Вы выбрали общение с ИИ.*\n\nЗадайте мне любой вопрос, и я постараюсь ответить!",
+            reply_markup=reply_markup
+        )
 
     elif query.data == "back":
-        await start_command(query.message, context)
-
-    elif query.data == "restart":
-        await start_command(query.message, context)
+        await back_to_main(query, context)
 
 # Обработчик текстовых сообщений
 async def handle_message(update: Update, context: CallbackContext):
+    user_id = update.message.from_user.id
     user_message = update.message.text
 
-    if context.user_data.get('awaiting_tts'):
-        context.user_data['awaiting_tts'] = False
-        response = client.audio.speech.create(
-            model="tts-1",
-            input=user_message,
-            voice="alloy"
-        )
-        with open("speech.mp3", "wb") as file:
-            file.write(response.content)
-        await update.message.reply_audio(audio=open("speech.mp3", "rb"))
-        return
+    # Проверяем, в каком режиме находится пользователь
+    user_state = user_states.get(user_id, "other")
 
-    try:
-        number = float(user_message)
-        sqrt_result = sp.sqrt(number)
-        result_str = str(sp.N(sqrt_result)).rstrip('0').rstrip('.') if '.' in str(sp.N(sqrt_result)) else str(sp.N(sqrt_result))
-        await update.message.reply_text(f"Корень числа {number} равен: {result_str}")
-        return
-    except ValueError:
-        pass
-
-    if any(char in user_message for char in ['+', '-', '*', '/', '^', '(', ')', '=']):
+    if user_state == "math":
         answer = solve_math_problem(user_message)
         await update.message.reply_text(f"🔢 {answer}")
         return
 
-    try:
-        completion = client.chat.completions.create(
-            messages=[{"role": "user", "content": user_message}],
-            max_tokens=1000,
-            model="gpt-4"
-        )
-        bot_response = completion.choices[0].message.content
-    except Exception as e:
-        bot_response = f"Произошла ошибка: {e}"
-    
-    await update.message.reply_text(bot_response)
+    elif user_state == "image":
+        try:
+            image_res = client.images.generate(
+                model="dall-e-3",
+                size="1024x1024",
+                quality="standard",
+                prompt=user_message
+            )
+            image_url = image_res.data[0].url
+            await update.message.reply_photo(photo=image_url, caption="Вот ваше изображение!")
+        except Exception as e:
+            await update.message.reply_text(f"Ошибка при генерации изображения: {e}")
+        return
+
+    elif user_state == "speech":
+        try:
+            response = client.audio.speech.create(
+                model="tts-1",
+                input=user_message,
+                voice="alloy"
+            )
+            speech_file = "speech.mp3"
+            with open(speech_file, "wb") as file:
+                file.write(response.content)
+            await update.message.reply_voice(voice=open(speech_file, "rb"))
+            os.remove(speech_file)  # Удаляем файл после отправки
+        except Exception as e:
+            await update.message.reply_text(f"Ошибка при генерации речи: {e}")
+        return
+
+    else:
+        # Генерация текстового ответа от ИИ
+        try:
+            completion = client.chat.completions.create(
+                messages=[{"role": "user", "content": user_message}],
+                max_tokens=1000,
+                model="gpt-4"
+            )
+            bot_response = completion.choices[0].message.content
+        except Exception as e:
+            bot_response = f"Произошла ошибка: {e}"
+
+        await update.message.reply_text(bot_response)
 
 # Запуск бота
 def main():
