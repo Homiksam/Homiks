@@ -62,6 +62,27 @@ def get_calculator_keyboard():
     ]
     return InlineKeyboardMarkup(keyboard)
 
+# Функция для создания клавиатуры для изображения
+def get_image_keyboard():
+    keyboard = [
+        [InlineKeyboardButton("🔙 Назад", callback_data='back_to_main')]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+# Функция для создания клавиатуры для речи
+def get_speech_keyboard():
+    keyboard = [
+        [InlineKeyboardButton("🔙 Назад", callback_data='back_to_main')]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+# Функция для создания клавиатуры ИИ помощника
+def get_ai_assistant_keyboard():
+    keyboard = [
+        [InlineKeyboardButton("🔙 Назад", callback_data='back_to_main')]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
 # Обработчик команды /start
 async def start_command(update: Update, context: CallbackContext):
     await update.message.reply_text(
@@ -87,17 +108,17 @@ async def button_click(update: Update, context: CallbackContext):
     
     elif query.data == "image":
         user_expressions[user_id] = "image"
-        await query.message.reply_text("🖼 Введите описание изображения:")
+        await query.message.reply_text("🖼 Введите описание изображения:", reply_markup=get_image_keyboard())
 
     elif query.data == "speech":
         user_expressions[user_id] = "speech"
-        await query.message.reply_text("🔊 Введите текст для озвучки:")
+        await query.message.reply_text("🔊 Введите текст для озвучки:", reply_markup=get_speech_keyboard())
 
     elif query.data == "other":
         user_expressions[user_id] = "other"
         await query.message.reply_text(
             "❓ Задайте свой вопрос! Я могу помочь вам с любыми вопросами. Просто напишите, и я постараюсь помочь.",
-            reply_markup=get_main_keyboard()
+            reply_markup=get_ai_assistant_keyboard()
         )
 
     elif query.data == "clear":
@@ -171,9 +192,9 @@ async def handle_message(update: Update, context: CallbackContext):
                 prompt=user_message
             )
             image_url = image_res.data[0].url
-            await update.message.reply_photo(photo=image_url, caption="Вот ваше изображение!")
+            await update.message.reply_photo(photo=image_url, caption="Вот ваше изображение!", reply_markup=get_image_keyboard())
         except Exception as e:
-            await update.message.reply_text(f"Ошибка: {e}")
+            await update.message.reply_text(f"Ошибка: {e}", reply_markup=get_image_keyboard())
     elif user_state == "speech":
         try:
             response = client.audio.speech.create(
@@ -184,10 +205,10 @@ async def handle_message(update: Update, context: CallbackContext):
             speech_file = "speech.mp3"
             with open(speech_file, "wb") as file:
                 file.write(response.content)
-            await update.message.reply_voice(voice=open(speech_file, "rb"))
+            await update.message.reply_voice(voice=open(speech_file, "rb"), reply_markup=get_speech_keyboard())
             os.remove(speech_file)
         except Exception as e:
-            await update.message.reply_text(f"Ошибка: {e}")
+            await update.message.reply_text(f"Ошибка: {e}", reply_markup=get_speech_keyboard())
     elif user_state == "other":
         # Обработка обычных сообщений, если это не математическое выражение
         try:
@@ -200,7 +221,7 @@ async def handle_message(update: Update, context: CallbackContext):
         except Exception as e:
             bot_response = f"Ошибка: {e}"
         
-        await update.message.reply_text(bot_response)
+        await update.message.reply_text(bot_response, reply_markup=get_ai_assistant_keyboard())
 
 # Запуск Flask для хостинга
 app = Flask(__name__)
