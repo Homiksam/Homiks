@@ -1,6 +1,6 @@
 import sympy as sp
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, CallbackContext
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, CallbackContext, ChatMemberHandler
 from telegram.constants import ChatMemberStatus
 from openai import OpenAI
 from flask import Flask
@@ -34,10 +34,9 @@ def solve_math_problem(problem: str):
     try:
         expr = sp.sympify(problem)
         result = sp.N(expr)
-        result_str = str(int(result)) if result == int(result) else str(result).rstrip('0').rstrip('.')
-        return f"Результат: {result_str}"
+        return f"Результат: {result}" if result != int(result) else f"Результат: {int(result)}"
     except Exception as e:
-        return f"Произошла ошибка: {e}"
+        return f"Ошибка: {e}"
 
 # Обработчик команды /start
 async def start_command(update: Update, context: CallbackContext):
@@ -46,7 +45,7 @@ async def start_command(update: Update, context: CallbackContext):
         reply_markup=get_main_keyboard()
     )
 
-# Обработчик входа пользователя в чат (автоматическая отправка меню)
+# Обработчик входа пользователя в чат
 async def chat_member_update(update: Update, context: CallbackContext):
     new_status = update.chat_member.new_chat_member.status
     if new_status in [ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR]:
@@ -56,28 +55,25 @@ async def chat_member_update(update: Update, context: CallbackContext):
             reply_markup=get_main_keyboard()
         )
 
-# Обработчик нажатий кнопок
+# Обработчик кнопок
 async def button_click(update: Update, context: CallbackContext):
     query = update.callback_query
     user_id = query.from_user.id
     await query.answer()
-
+    
     if query.data == "math":
         user_states[user_id] = "math"
-        message = "🔢 Вы выбрали *математику*. Введите выражение, например: `2+2*3`."
-
+        message = "🔢 Введите математическое выражение:"
     elif query.data == "image":
         user_states[user_id] = "image"
-        message = "🖼 Вы выбрали *генерацию изображения*. Введите описание картинки."
-
+        message = "🖼 Введите описание изображения:"
     elif query.data == "speech":
         user_states[user_id] = "speech"
-        message = "🔊 Вы выбрали *генерацию речи (TTS)*. Введите текст для озвучки."
-
+        message = "🔊 Введите текст для озвучки:"
     elif query.data == "other":
         user_states[user_id] = "other"
-        message = "❓ Вы выбрали *общение с ИИ*. Напишите вопрос!"
-
+        message = "❓ Задайте свой вопрос:"
+    
     await query.message.edit_text(text=message, reply_markup=get_main_keyboard())
 
 # Обработчик текстовых сообщений
@@ -85,11 +81,10 @@ async def handle_message(update: Update, context: CallbackContext):
     user_id = update.message.from_user.id
     user_message = update.message.text
     user_state = user_states.get(user_id, "other")
-
+    
     if user_state == "math":
         answer = solve_math_problem(user_message)
-        await update.message.reply_text(f"🔢 {answer}", reply_markup=get_main_keyboard())
-
+        await update.message.reply_text(answer, reply_markup=get_main_keyboard())
     elif user_state == "image":
         try:
             image_res = client.images.generate(
@@ -101,8 +96,7 @@ async def handle_message(update: Update, context: CallbackContext):
             image_url = image_res.data[0].url
             await update.message.reply_photo(photo=image_url, caption="Вот ваше изображение!", reply_markup=get_main_keyboard())
         except Exception as e:
-            await update.message.reply_text(f"Ошибка при генерации изображения: {e}", reply_markup=get_main_keyboard())
-
+            await update.message.reply_text(f"Ошибка: {e}", reply_markup=get_main_keyboard())
     elif user_state == "speech":
         try:
             response = client.audio.speech.create(
@@ -113,13 +107,10 @@ async def handle_message(update: Update, context: CallbackContext):
             speech_file = "speech.mp3"
             with open(speech_file, "wb") as file:
                 file.write(response.content)
-            
-            # Отправка только голосового сообщения, без текста
             await update.message.reply_voice(voice=open(speech_file, "rb"))
             os.remove(speech_file)
         except Exception as e:
-            await update.message.reply_text(f"Ошибка при генерации речи: {e}")
-
+            await update.message.reply_text(f"Ошибка: {e}")
     else:
         try:
             completion = client.chat.completions.create(
@@ -129,19 +120,17 @@ async def handle_message(update: Update, context: CallbackContext):
             )
             bot_response = completion.choices[0].message.content
         except Exception as e:
-            bot_response = f"Произошла ошибка: {e}"
-
+            bot_response = f"Ошибка: {e}"
+        
         await update.message.reply_text(bot_response, reply_markup=get_main_keyboard())
 
 # Запуск бота
 def main():
     application = Application.builder().token(TELEGRAM_TOKEN).build()
-
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CallbackQueryHandler(button_click))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    application.add_handler(MessageHandler(filters.StatusUpdate.CHAT_MEMBER, chat_member_update))  # Автоматическая отправка меню при входе
-
+    application.add_handler(ChatMemberHandler(chat_member_update, ChatMemberHandler.CHAT_MEMBER))
     application.run_polling()
 
 # Запуск Flask для хостинга
