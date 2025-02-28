@@ -1,6 +1,7 @@
 import sympy as sp
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, CallbackContext
+from telegram.constants import ChatMemberStatus
 from openai import OpenAI
 from flask import Flask
 import threading
@@ -44,6 +45,16 @@ async def start_command(update: Update, context: CallbackContext):
         "Привет! Выберите действие:",
         reply_markup=get_main_keyboard()
     )
+
+# Обработчик входа пользователя в чат (автоматическая отправка меню)
+async def chat_member_update(update: Update, context: CallbackContext):
+    new_status = update.chat_member.new_chat_member.status
+    if new_status in [ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR]:
+        await context.bot.send_message(
+            chat_id=update.chat_member.chat.id,
+            text="Привет! Выберите действие:",
+            reply_markup=get_main_keyboard()
+        )
 
 # Обработчик нажатий кнопок
 async def button_click(update: Update, context: CallbackContext):
@@ -125,9 +136,12 @@ async def handle_message(update: Update, context: CallbackContext):
 # Запуск бота
 def main():
     application = Application.builder().token(TELEGRAM_TOKEN).build()
+
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CallbackQueryHandler(button_click))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    application.add_handler(MessageHandler(filters.StatusUpdate.CHAT_MEMBER, chat_member_update))  # Автоматическая отправка меню при входе
+
     application.run_polling()
 
 # Запуск Flask для хостинга
