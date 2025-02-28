@@ -76,7 +76,13 @@ async def button_click(update: Update, context: CallbackContext):
 
     if query.data == "math":
         user_expressions[user_id] = ""
-        await query.message.reply_text("Составьте выражение с помощью кнопок:", reply_markup=get_calculator_keyboard())
+        # Создаем новое сообщение и отправляем клавиатуру калькулятора
+        message = await query.message.reply_text(
+            "Составьте выражение с помощью кнопок:",
+            reply_markup=get_calculator_keyboard()
+        )
+        # Сохраняем id сообщения, чтобы можно было обновить его
+        user_expressions[user_id] = {"expression": "", "message_id": message.message_id}
     
     elif query.data == "image":
         user_expressions[user_id] = "image"
@@ -98,17 +104,18 @@ async def button_click(update: Update, context: CallbackContext):
         await query.message.reply_text("Выражение очищено. Начните заново.", reply_markup=get_calculator_keyboard())
 
     elif query.data == "solve":
-        user_expression = user_expressions.get(user_id, "")
+        user_expression = user_expressions.get(user_id, "").get("expression", "")
         if user_expression:
             answer = solve_math_problem(user_expression)
-            await query.message.reply_text(f"Текущее выражение: {user_expression}\n{answer}", reply_markup=get_calculator_keyboard())
-            user_expressions[user_id] = ""  # Очищаем выражение после вычисления
+            # Обновляем текст в том же сообщении
+            await query.message.edit_text(f"Текущее выражение: {user_expression}\n{answer}", reply_markup=get_calculator_keyboard())
+            user_expressions[user_id]["expression"] = ""  # Очищаем выражение после вычисления
         else:
             await query.message.reply_text("Пожалуйста, введите выражение через кнопки калькулятора.", reply_markup=get_calculator_keyboard())
         
     elif query.data == "sqrt":
         # Если в выражении есть число, считаем его квадратный корень
-        user_expression = user_expressions.get(user_id, "")
+        user_expression = user_expressions.get(user_id, "").get("expression", "")
         if user_expression:
             try:
                 # Преобразуем выражение и вычисляем квадратный корень
@@ -123,17 +130,18 @@ async def button_click(update: Update, context: CallbackContext):
                         result_str = result_str.rstrip('0').rstrip('.') 
 
                     result = f"Квадратный корень из {user_expression} = {result_str}"
-                await query.message.reply_text(result, reply_markup=get_calculator_keyboard())
-                user_expressions[user_id] = ""  # Очищаем выражение после вычисления
+                await query.message.edit_text(result, reply_markup=get_calculator_keyboard())
+                user_expressions[user_id]["expression"] = ""  # Очищаем выражение после вычисления
             except Exception as e:
-                await query.message.reply_text(f"Ошибка: {e}", reply_markup=get_calculator_keyboard())
+                await query.message.edit_text(f"Ошибка: {e}", reply_markup=get_calculator_keyboard())
         else:
-            await query.message.reply_text("Пожалуйста, введите число для вычисления квадратного корня.", reply_markup=get_calculator_keyboard())
+            await query.message.edit_text("Пожалуйста, введите число для вычисления квадратного корня.", reply_markup=get_calculator_keyboard())
 
     else:
         # Добавляем введенный символ в текущее выражение пользователя
-        user_expressions[user_id] += query.data
-        await query.message.reply_text(f"Текущее выражение: {user_expressions[user_id]}", reply_markup=get_calculator_keyboard())
+        user_expressions[user_id]["expression"] += query.data
+        # Обновляем текст в том же сообщении
+        await query.message.edit_text(f"Текущее выражение: {user_expressions[user_id]['expression']}", reply_markup=get_calculator_keyboard())
 
 # Обработчик текстовых сообщений
 async def handle_message(update: Update, context: CallbackContext):
