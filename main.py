@@ -11,12 +11,22 @@ TELEGRAM_TOKEN = "7649909820:AAG_ofyeA__Q6iLHWl1WQaFuiS6iaUhxW3Q"
 
 # Настройка OpenAI через AITUNNEL
 client = OpenAI(
-    api_key="sk-aitunnel-ynPRiPL0SFNxo2Gm1YkgWbjGsxVIdgEy",  # Ключ из нашего сервиса
+    api_key="sk-aitunnel-ynPRiPL0SFNxo2Gm1YkgWbjGsxVIdgEy",
     base_url="https://api.aitunnel.ru/v1/",
 )
 
 # Словарь для хранения состояний пользователей
 user_states = {}
+
+# Функция для создания клавиатуры с кнопками
+def get_main_keyboard():
+    keyboard = [
+        [InlineKeyboardButton("📊 Математические задачи", callback_data='math')],
+        [InlineKeyboardButton("🖼 Сгенерировать изображение", callback_data='image')],
+        [InlineKeyboardButton("🔊 Сгенерировать речь (TTS)", callback_data='speech')],
+        [InlineKeyboardButton("❓ Другое", callback_data='other')]
+    ]
+    return InlineKeyboardMarkup(keyboard)
 
 # Функция для решения математических задач
 def solve_math_problem(problem: str):
@@ -30,19 +40,12 @@ def solve_math_problem(problem: str):
 
 # Обработчик команды /start
 async def start_command(update: Update, context: CallbackContext):
-    keyboard = [
-        [InlineKeyboardButton("📊 Математические задачи", callback_data='math')],
-        [InlineKeyboardButton("🖼 Сгенерировать изображение", callback_data='image')],
-        [InlineKeyboardButton("🔊 Сгенерировать речь (TTS)", callback_data='speech')],
-        [InlineKeyboardButton("❓ Другое", callback_data='other')]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(
-        "Привет! Я бот, который может решать математические задачи, генерировать изображения, синтезировать речь и отвечать на вопросы.\n\nВыберите действие:",
-        reply_markup=reply_markup
+        "Привет! Выберите действие:",
+        reply_markup=get_main_keyboard()
     )
 
-# Обработчик кнопок
+# Обработчик нажатий кнопок
 async def button_click(update: Update, context: CallbackContext):
     query = update.callback_query
     user_id = query.from_user.id
@@ -50,40 +53,31 @@ async def button_click(update: Update, context: CallbackContext):
 
     if query.data == "math":
         user_states[user_id] = "math"
-        await query.message.reply_text(
-            "🔢 Вы выбрали режим *математических задач*.\n\nВведите математическое выражение, например: `2+2*3` или `sqrt(16)`."
-        )
+        message = "🔢 Вы выбрали *математику*. Введите выражение, например: `2+2*3`."
 
     elif query.data == "image":
         user_states[user_id] = "image"
-        await query.message.reply_text(
-            "🖼 Вы выбрали *генерацию изображения*.\n\nВведите описание картинки, например: `космический корабль, летающий над Марсом`."
-        )
+        message = "🖼 Вы выбрали *генерацию изображения*. Введите описание картинки."
 
     elif query.data == "speech":
         user_states[user_id] = "speech"
-        await query.message.reply_text(
-            "🔊 Вы выбрали *генерацию речи (TTS)*.\n\nВведите текст, который хотите преобразовать в голосовое сообщение."
-        )
+        message = "🔊 Вы выбрали *генерацию речи (TTS)*. Введите текст для озвучки."
 
     elif query.data == "other":
         user_states[user_id] = "other"
-        await query.message.reply_text(
-            "❓ Вы выбрали *общение с ИИ*.\n\nЗадайте мне любой вопрос, и я постараюсь ответить!"
-        )
+        message = "❓ Вы выбрали *общение с ИИ*. Напишите вопрос!"
+
+    await query.message.edit_text(text=message, reply_markup=get_main_keyboard())
 
 # Обработчик текстовых сообщений
 async def handle_message(update: Update, context: CallbackContext):
     user_id = update.message.from_user.id
     user_message = update.message.text
-
-    # Проверяем, в каком режиме находится пользователь
     user_state = user_states.get(user_id, "other")
 
     if user_state == "math":
         answer = solve_math_problem(user_message)
-        await update.message.reply_text(f"🔢 {answer}")
-        return
+        await update.message.reply_text(f"🔢 {answer}", reply_markup=get_main_keyboard())
 
     elif user_state == "image":
         try:
@@ -94,10 +88,9 @@ async def handle_message(update: Update, context: CallbackContext):
                 prompt=user_message
             )
             image_url = image_res.data[0].url
-            await update.message.reply_photo(photo=image_url, caption="Вот ваше изображение!")
+            await update.message.reply_photo(photo=image_url, caption="Вот ваше изображение!", reply_markup=get_main_keyboard())
         except Exception as e:
-            await update.message.reply_text(f"Ошибка при генерации изображения: {e}")
-        return
+            await update.message.reply_text(f"Ошибка при генерации изображения: {e}", reply_markup=get_main_keyboard())
 
     elif user_state == "speech":
         try:
@@ -109,14 +102,14 @@ async def handle_message(update: Update, context: CallbackContext):
             speech_file = "speech.mp3"
             with open(speech_file, "wb") as file:
                 file.write(response.content)
+            
+            # Отправка только голосового сообщения, без текста
             await update.message.reply_voice(voice=open(speech_file, "rb"))
-            os.remove(speech_file)  # Удаляем файл после отправки
+            os.remove(speech_file)
         except Exception as e:
             await update.message.reply_text(f"Ошибка при генерации речи: {e}")
-        return
 
     else:
-        # Генерация текстового ответа от ИИ
         try:
             completion = client.chat.completions.create(
                 messages=[{"role": "user", "content": user_message}],
@@ -127,7 +120,7 @@ async def handle_message(update: Update, context: CallbackContext):
         except Exception as e:
             bot_response = f"Произошла ошибка: {e}"
 
-        await update.message.reply_text(bot_response)
+        await update.message.reply_text(bot_response, reply_markup=get_main_keyboard())
 
 # Запуск бота
 def main():
