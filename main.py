@@ -57,7 +57,8 @@ def get_calculator_keyboard():
         [InlineKeyboardButton("0", callback_data='0'), InlineKeyboardButton("+", callback_data='+'), InlineKeyboardButton("-", callback_data='-')],
         [InlineKeyboardButton("*", callback_data='*'), InlineKeyboardButton("/", callback_data='/')],
         [InlineKeyboardButton("√", callback_data='sqrt'), InlineKeyboardButton("=", callback_data='solve')],
-        [InlineKeyboardButton("Очистить", callback_data='clear')]
+        [InlineKeyboardButton("Очистить", callback_data='clear')],
+        [InlineKeyboardButton("🔙 Назад", callback_data='back_to_main')]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -136,6 +137,15 @@ async def button_click(update: Update, context: CallbackContext):
                 await query.message.edit_text(f"Ошибка: {e}", reply_markup=get_calculator_keyboard())
         else:
             await query.message.edit_text("Пожалуйста, введите число для вычисления квадратного корня.", reply_markup=get_calculator_keyboard())
+
+    elif query.data == "back_to_main":
+        # Возвращаемся в главное меню
+        await query.message.edit_text(
+            "Выберите действие:",
+            reply_markup=get_main_keyboard()
+        )
+        # Очищаем состояние пользователя
+        user_expressions[user_id] = {}
 
     else:
         # Добавляем введенный символ в текущее выражение пользователя
