@@ -46,8 +46,7 @@ def get_calculator_keyboard():
         [InlineKeyboardButton("4", callback_data='4'), InlineKeyboardButton("5", callback_data='5'), InlineKeyboardButton("6", callback_data='6')],
         [InlineKeyboardButton("1", callback_data='1'), InlineKeyboardButton("2", callback_data='2'), InlineKeyboardButton("3", callback_data='3')],
         [InlineKeyboardButton("0", callback_data='0'), InlineKeyboardButton("+", callback_data='+'), InlineKeyboardButton("-", callback_data='-')],
-        [InlineKeyboardButton("*", callback_data='*'), InlineKeyboardButton("/", callback_data='/'), InlineKeyboardButton("(", callback_data='('), InlineKeyboardButton(")", callback_data=')')],
-        [InlineKeyboardButton("π", callback_data='pi'), InlineKeyboardButton("e", callback_data='e'), InlineKeyboardButton("sin", callback_data='sin'), InlineKeyboardButton("cos", callback_data='cos')],
+        [InlineKeyboardButton("*", callback_data='*'), InlineKeyboardButton("/", callback_data='/'), InlineKeyboardButton("√", callback_data='sqrt')],
         [InlineKeyboardButton("=", callback_data='solve'), InlineKeyboardButton("Очистить", callback_data='clear')],
         [InlineKeyboardButton("🔙 Назад", callback_data="back_to_main")]
     ]
@@ -71,7 +70,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_states[user_id] = {"mode": "math", "expression": ""}
         await query.message.reply_text("Собери выражение с помощью кнопок:", reply_markup=get_calculator_keyboard())
 
-    elif data in ("0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "+", "-", "*", "/", "(", ")", "^"):
+    elif data in ("0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "+", "-", "*", "/", "(", ")"):
         if user_states.get(user_id, {}).get("mode") == "math":
             user_states[user_id]["expression"] += data
             await query.message.edit_text(f"Выражение: {user_states[user_id]['expression']}", reply_markup=get_calculator_keyboard())
@@ -84,9 +83,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "solve":
         expr = user_states.get(user_id, {}).get("expression", "")
         try:
-            expr = expr.replace("^", "**")  # заменяем степень
-            expr = expr.replace("pi", str(sp.pi))  # заменяем π
-            expr = expr.replace("e", str(sp.E))  # заменяем e
             result = sp.sympify(expr, evaluate=True)
             evaluated = sp.N(result)
             if evaluated == int(evaluated):
