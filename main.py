@@ -1,7 +1,10 @@
 import os
 import sympy as sp
 from flask import Flask
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import (
+    InlineKeyboardButton, InlineKeyboardMarkup,
+    ReplyKeyboardMarkup, KeyboardButton, Update
+)
 from telegram.ext import (
     Application, CommandHandler, MessageHandler,
     CallbackQueryHandler, ContextTypes, filters
@@ -9,19 +12,15 @@ from telegram.ext import (
 from openai import OpenAI
 import threading
 
-# Telegram Token
 TELEGRAM_TOKEN = "7649909820:AAG_ofyeA__Q6iLHWl1WQaFuiS6iaUhxW3Q"
 
-# OpenAI через AITUNNEL
 client = OpenAI(
     api_key="sk-aitunnel-ynPRiPL0SFNxo2Gm1YkgWbjGsxVIdgEy",
     base_url="https://api.aitunnel.ru/v1/",
 )
 
-# Состояния пользователей
 user_states = {}
 
-# Клавиатура главного меню
 def get_main_keyboard():
     keyboard = [
         [InlineKeyboardButton("📊 Калькулятор", callback_data="math")],
@@ -31,15 +30,17 @@ def get_main_keyboard():
     ]
     return InlineKeyboardMarkup(keyboard)
 
-# Клавиатура с кнопкой "Назад"
 def back_keyboard():
     return InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data="back_to_main")]])
 
-# Клавиатура с кнопкой "Главное меню"
 def get_main_menu_button():
     return InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Главное меню", callback_data="back_to_main")]])
 
-# Калькулятор
+# 🔸 Постоянная клавиатура под полем ввода
+def get_persistent_keyboard():
+    keyboard = [[KeyboardButton("🏠 Главное меню")]]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
 def get_calculator_keyboard():
     keyboard = [
         [InlineKeyboardButton("7", callback_data='7'), InlineKeyboardButton("8", callback_data='8'), InlineKeyboardButton("9", callback_data='9')],
@@ -52,12 +53,10 @@ def get_calculator_keyboard():
     ]
     return InlineKeyboardMarkup(keyboard)
 
-# /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Отправляем сообщение с кнопкой "Главное меню"
-    await update.message.reply_text("Привет! Что будем делать?", reply_markup=get_main_menu_button())
+    await update.message.reply_text("Привет! Что будем делать?", reply_markup=get_persistent_keyboard())
+    await update.message.reply_text("Выберите действие:", reply_markup=get_main_keyboard())
 
-# Обработка кнопок
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -120,11 +119,16 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_states[user_id] = {"mode": "other"}
         await query.message.reply_text("Задайте свой вопрос ИИ:", reply_markup=back_keyboard())
 
-# Обработка текстов
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     user_input = update.message.text
     mode = user_states.get(user_id, {}).get("mode")
+
+    # 🔹 Обработка постоянной кнопки "Главное меню"
+    if user_input == "🏠 Главное меню":
+        user_states[user_id] = None
+        await update.message.reply_text("Вы вернулись в главное меню:", reply_markup=get_main_keyboard())
+        return
 
     if mode == "image":
         try:
@@ -160,9 +164,8 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"Ошибка: {e}", reply_markup=get_main_menu_button())
 
     else:
-        await update.message.reply_text("Пожалуйста, выберите действие из меню:", reply_markup=get_main_menu_button())
+        await update.message.reply_text("Пожалуйста, выберите действие из меню:", reply_markup=get_main_keyboard())
 
-# Flask-сервер
 app = Flask(__name__)
 
 @app.route("/")
@@ -172,7 +175,6 @@ def home():
 def run_flask():
     app.run(host="0.0.0.0", port=10000)
 
-# Запуск бота
 def main():
     application = Application.builder().token(TELEGRAM_TOKEN).build()
     application.add_handler(CommandHandler("start", start))
@@ -183,4 +185,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
