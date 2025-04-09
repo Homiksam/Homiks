@@ -65,14 +65,14 @@ def get_calculator_keyboard():
 # Функция для создания клавиатуры для изображения
 def get_image_keyboard():
     keyboard = [
-        [InlineKeyboardButton("🔙 Назад", callback_data='back_to_main')]
+        [InlineKeyboardButton("🔙 Назад", callback_data='image_back')]
     ]
     return InlineKeyboardMarkup(keyboard)
 
 # Функция для создания клавиатуры для речи
 def get_speech_keyboard():
     keyboard = [
-        [InlineKeyboardButton("🔙 Назад", callback_data='back_to_main')]
+        [InlineKeyboardButton("🔙 Назад", callback_data='speech_back')]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -91,8 +91,6 @@ async def start_command(update: Update, context: CallbackContext):
     )
 
 # Обработчик кнопок
-# Обработчик кнопок
-# Обработчик кнопок
 async def button_click(update: Update, context: CallbackContext):
     query = update.callback_query
     user_id = query.from_user.id
@@ -100,12 +98,10 @@ async def button_click(update: Update, context: CallbackContext):
 
     if query.data == "math":
         user_expressions[user_id] = ""
-        # Создаем новое сообщение и отправляем клавиатуру калькулятора
         message = await query.message.reply_text(
             "Составьте выражение с помощью кнопок:",
             reply_markup=get_calculator_keyboard()
         )
-        # Сохраняем id сообщения, чтобы можно было обновить его
         user_expressions[user_id] = {"expression": "", "message_id": message.message_id}
     
     elif query.data == "image":
@@ -124,27 +120,22 @@ async def button_click(update: Update, context: CallbackContext):
         )
 
     elif query.data == "clear":
-        # Проверяем, что у пользователя уже есть сохранённое выражение
         if user_id not in user_expressions or not isinstance(user_expressions[user_id], dict):
             user_expressions[user_id] = {"expression": "", "message_id": query.message.message_id}
         else:
             user_expressions[user_id]["expression"] = ""
-
-        # Очищаем старое сообщение, редактируя его
         await query.message.edit_text("Текущее выражение: ", reply_markup=get_calculator_keyboard())
 
     elif query.data == "solve":
         user_expression = user_expressions.get(user_id, {}).get("expression", "")
         if user_expression:
             answer = solve_math_problem(user_expression)
-            # Обновляем текст в том же сообщении
             await query.message.edit_text(f"Текущее выражение: {user_expression}\n{answer}", reply_markup=get_calculator_keyboard())
-            user_expressions[user_id]["expression"] = ""  # Очищаем выражение после вычисления
+            user_expressions[user_id]["expression"] = ""
         else:
             await query.message.reply_text("Пожалуйста, введите выражение через кнопки калькулятора.", reply_markup=get_calculator_keyboard())
 
     elif query.data == "backspace":
-        # Удаляем последний символ из текущего выражения
         user_expression = user_expressions.get(user_id, {}).get("expression", "")
         if user_expression:
             user_expressions[user_id]["expression"] = user_expression[:-1]
@@ -153,11 +144,9 @@ async def button_click(update: Update, context: CallbackContext):
             await query.message.edit_text("Текущее выражение: ", reply_markup=get_calculator_keyboard())
 
     elif query.data == "sqrt":
-        # Если в выражении есть число, считаем его квадратный корень
         user_expression = user_expressions.get(user_id, {}).get("expression", "")
         if user_expression:
             try:
-                # Преобразуем выражение и вычисляем квадратный корень
                 num = float(user_expression)
                 if num < 0:
                     result = "Ошибка: Не можно вычислить квадратный корень из отрицательного числа."
@@ -170,23 +159,20 @@ async def button_click(update: Update, context: CallbackContext):
 
                     result = f"Квадратный корень из {user_expression} = {result_str}"
                 await query.message.edit_text(result, reply_markup=get_calculator_keyboard())
-                user_expressions[user_id]["expression"] = ""  # Очищаем выражение после вычисления
+                user_expressions[user_id]["expression"] = ""
             except Exception as e:
                 await query.message.edit_text(f"Ошибка: {e}", reply_markup=get_calculator_keyboard())
         else:
             await query.message.edit_text("Пожалуйста, введите число для вычисления квадратного корня.", reply_markup=get_calculator_keyboard())
 
     elif query.data == "back_to_main":
-        # Возвращаемся в главное меню
         await query.message.edit_text(
             "Выберите действие:",
             reply_markup=get_main_keyboard()
         )
-        # Очищаем состояние пользователя
         user_expressions[user_id] = {}
 
     elif query.data == "image_back":
-        # Возвращаемся в главное меню после генерации изображения
         await query.message.edit_text(
             "Выберите действие:",
             reply_markup=get_main_keyboard()
@@ -194,7 +180,6 @@ async def button_click(update: Update, context: CallbackContext):
         user_expressions[user_id] = {}
 
     elif query.data == "speech_back":
-        # Возвращаемся в главное меню после озвучивания
         await query.message.edit_text(
             "Выберите действие:",
             reply_markup=get_main_keyboard()
@@ -202,11 +187,8 @@ async def button_click(update: Update, context: CallbackContext):
         user_expressions[user_id] = {}
 
     else:
-        # Добавляем введенный символ в текущее выражение пользователя
         user_expressions[user_id]["expression"] += query.data
-        # Обновляем текст в том же сообщении
         await query.message.edit_text(f"Текущее выражение: {user_expressions[user_id]['expression']}", reply_markup=get_calculator_keyboard())
-
 
 # Обработчик текстовых сообщений
 async def handle_message(update: Update, context: CallbackContext):
@@ -215,7 +197,6 @@ async def handle_message(update: Update, context: CallbackContext):
     user_state = user_expressions.get(user_id, "other")
 
     if user_state == "math":
-        # Если сообщение не содержит чисел или операторов, оно не будет обработано
         await update.message.reply_text("Пожалуйста, используйте кнопки для ввода математического выражения.")
     elif user_state == "image":
         try:
@@ -244,7 +225,6 @@ async def handle_message(update: Update, context: CallbackContext):
         except Exception as e:
             await update.message.reply_text(f"Ошибка: {e}", reply_markup=get_speech_keyboard())
     elif user_state == "other":
-        # Обработка обычных сообщений, если это не математическое выражение
         try:
             completion = client.chat.completions.create(
                 messages=[{"role": "user", "content": user_message}],
