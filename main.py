@@ -35,6 +35,10 @@ def get_main_keyboard():
 def back_keyboard():
     return InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data="back_to_main")]])
 
+# Клавиатура с кнопкой "Главное меню"
+def get_main_menu_button():
+    return InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Главное меню", callback_data="back_to_main")]])
+
 # Калькулятор
 def get_calculator_keyboard():
     keyboard = [
@@ -50,7 +54,8 @@ def get_calculator_keyboard():
 
 # /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Привет! Что будем делать?", reply_markup=get_main_keyboard())
+    # Отправляем сообщение с кнопкой "Главное меню"
+    await update.message.reply_text("Привет! Что будем делать?", reply_markup=get_main_menu_button())
 
 # Обработка кнопок
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -124,9 +129,9 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if mode == "image":
         try:
             img = client.images.generate(model="dall-e-3", prompt=user_input, size="1024x1024", quality="standard")
-            await update.message.reply_photo(photo=img.data[0].url, caption="Вот ваше изображение!", reply_markup=back_keyboard())
+            await update.message.reply_photo(photo=img.data[0].url, caption="Вот ваше изображение!", reply_markup=get_main_menu_button())
         except Exception as e:
-            await update.message.reply_text(f"Ошибка: {e}", reply_markup=back_keyboard())
+            await update.message.reply_text(f"Ошибка: {e}", reply_markup=get_main_menu_button())
 
     elif mode == "speech":
         try:
@@ -138,10 +143,10 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             file_path = "speech.mp3"
             with open(file_path, "wb") as f:
                 f.write(response.content)
-            await update.message.reply_voice(voice=open(file_path, "rb"), reply_markup=back_keyboard())
+            await update.message.reply_voice(voice=open(file_path, "rb"), reply_markup=get_main_menu_button())
             os.remove(file_path)
         except Exception as e:
-            await update.message.reply_text(f"Ошибка: {e}", reply_markup=back_keyboard())
+            await update.message.reply_text(f"Ошибка: {e}", reply_markup=get_main_menu_button())
 
     elif mode == "other":
         try:
@@ -150,12 +155,12 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 messages=[{"role": "user", "content": user_input}],
                 max_tokens=1000
             )
-            await update.message.reply_text(chat.choices[0].message.content, reply_markup=back_keyboard())
+            await update.message.reply_text(chat.choices[0].message.content, reply_markup=get_main_menu_button())
         except Exception as e:
-            await update.message.reply_text(f"Ошибка: {e}", reply_markup=back_keyboard())
+            await update.message.reply_text(f"Ошибка: {e}", reply_markup=get_main_menu_button())
 
     else:
-        await update.message.reply_text("Пожалуйста, выберите действие из меню:", reply_markup=get_main_keyboard())
+        await update.message.reply_text("Пожалуйста, выберите действие из меню:", reply_markup=get_main_menu_button())
 
 # Flask-сервер
 app = Flask(__name__)
@@ -178,3 +183,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
