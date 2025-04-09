@@ -237,24 +237,16 @@ async def handle_message(update: Update, context: CallbackContext):
         
         await update.message.reply_text(bot_response, reply_markup=get_ai_assistant_keyboard())
 
-# Запуск Flask для хостинга
-app = Flask(__name__)
-
-@app.route('/')
-def home():
-    return "Бот работает!"
-
-def run_flask():
-    app.run(host="0.0.0.0", port=10000)
-
-# Основная функция
-def main():
+# Запуск бота
+async def main():
     application = Application.builder().token(TELEGRAM_TOKEN).build()
+
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CallbackQueryHandler(button_click))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    application.run_polling()
 
-if __name__ == '__main__':
-    threading.Thread(target=run_flask).start()
-    main()
+    # Запуск бота
+    await application.run_polling()
+
+if __name__ == "__main__":
+    threading.Thread(target=main).start()
