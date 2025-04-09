@@ -1,32 +1,39 @@
-import sympy as sp
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, CallbackContext
-from openai import OpenAI
 import os
+import sympy as sp
 from flask import Flask
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import (
+    Application, CommandHandler, MessageHandler,
+    CallbackQueryHandler, ContextTypes, filters
+)
+from openai import OpenAI
 import threading
 
+# Telegram Token
 TELEGRAM_TOKEN = "7649909820:AAG_ofyeA__Q6iLHWl1WQaFuiS6iaUhxW3Q"
+
+# OpenAI через AITUNNEL
 client = OpenAI(
     api_key="sk-aitunnel-ynPRiPL0SFNxo2Gm1YkgWbjGsxVIdgEy",
     base_url="https://api.aitunnel.ru/v1/",
 )
 
-user_expressions = {}
+# Состояния пользователей
+user_states = {}
 
-# Универсальная кнопка "Назад"
-def back_button():
-    return [InlineKeyboardButton("🔙 Назад", callback_data='back_to_main')]
-
-# Главная клавиатура
+# Клавиатура главного меню
 def get_main_keyboard():
     keyboard = [
-        [InlineKeyboardButton("📊 Математические задачи", callback_data='math')],
-        [InlineKeyboardButton("🖼 Сгенерировать изображение", callback_data='image')],
-        [InlineKeyboardButton("🔊 Сгенерировать речь (TTS)", callback_data='speech')],
-        [InlineKeyboardButton("🤖 ИИ помощник", callback_data='other')]
+        [InlineKeyboardButton("📊 Калькулятор", callback_data="math")],
+        [InlineKeyboardButton("🖼 Генерация изображения", callback_data="image")],
+        [InlineKeyboardButton("🔊 Озвучить текст", callback_data="speech")],
+        [InlineKeyboardButton("🤖 ИИ помощник", callback_data="other")],
     ]
     return InlineKeyboardMarkup(keyboard)
+
+# Клавиатура с кнопкой "Назад"
+def back_keyboard():
+    return InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data="back_to_main")]])
 
 # Калькулятор
 def get_calculator_keyboard():
@@ -37,165 +44,125 @@ def get_calculator_keyboard():
         [InlineKeyboardButton("0", callback_data='0'), InlineKeyboardButton("+", callback_data='+'), InlineKeyboardButton("-", callback_data='-')],
         [InlineKeyboardButton("*", callback_data='*'), InlineKeyboardButton("/", callback_data='/'), InlineKeyboardButton("√", callback_data='sqrt')],
         [InlineKeyboardButton("=", callback_data='solve'), InlineKeyboardButton("Очистить", callback_data='clear')],
-        back_button()
+        [InlineKeyboardButton("🔙 Назад", callback_data="back_to_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
-def get_simple_keyboard():
-    return InlineKeyboardMarkup([back_button()])
-
-# Решение примера
-def solve_math_problem(problem: str):
-    try:
-        expr = sp.sympify(problem)
-        result = sp.N(expr)
-        result = int(result) if result == int(result) else round(result, 10)
-        return f"Результат: {str(result).rstrip('0').rstrip('.') if '.' in str(result) else result}"
-    except Exception as e:
-        return f"Произошла ошибка: {e}"
-
 # /start
-async def start_command(update: Update, context: CallbackContext):
-    await update.message.reply_text(
-        "Привет! Я могу помочь с различными задачами. Выберите действие:",
-        reply_markup=get_main_keyboard()
-    )
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Привет! Что будем делать?", reply_markup=get_main_keyboard())
 
 # Обработка кнопок
-async def button_click(update: Update, context: CallbackContext):
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    user_id = query.from_user.id
     await query.answer()
-
-    def edit(text, reply_markup):
-        try:
-            return context.bot.edit_message_text(
-                chat_id=query.message.chat_id,
-                message_id=query.message.message_id,
-                text=text,
-                reply_markup=reply_markup
-            )
-        except Exception as e:
-            return query.message.reply_text(f"Ошибка: {e}")
-
+    user_id = query.from_user.id
     data = query.data
 
-    if data == "math":
-        user_expressions[user_id] = {"expression": "", "message_id": query.message.message_id}
-        await edit("Составьте выражение с помощью кнопок:", get_calculator_keyboard())
+    if data == "back_to_main":
+        user_states[user_id] = None
+        await query.message.reply_text("Вы вернулись в главное меню:", reply_markup=get_main_keyboard())
 
-    elif data == "image":
-        user_expressions[user_id] = "image"
-        await edit("🖼 Введите описание изображения:", get_simple_keyboard())
+    elif data == "math":
+        user_states[user_id] = {"mode": "math", "expression": ""}
+        await query.message.reply_text("Собери выражение с помощью кнопок:", reply_markup=get_calculator_keyboard())
 
-    elif data == "speech":
-        user_expressions[user_id] = "speech"
-        await edit("🔊 Введите текст для озвучки:", get_simple_keyboard())
-
-    elif data == "other":
-        user_expressions[user_id] = "other"
-        await edit("❓ Задайте вопрос, и я постараюсь помочь:", get_simple_keyboard())
+    elif data in "0123456789+-*/":
+        if user_states.get(user_id, {}).get("mode") == "math":
+            user_states[user_id]["expression"] += data
+            await query.message.edit_text(f"Выражение: {user_states[user_id]['expression']}", reply_markup=get_calculator_keyboard())
 
     elif data == "clear":
-        if user_id not in user_expressions or not isinstance(user_expressions[user_id], dict):
-            user_expressions[user_id] = {"expression": "", "message_id": query.message.message_id}
-        else:
-            user_expressions[user_id]["expression"] = ""
-        await edit("Текущее выражение: ", get_calculator_keyboard())
+        if user_states.get(user_id, {}).get("mode") == "math":
+            user_states[user_id]["expression"] = ""
+            await query.message.edit_text("Выражение очищено.", reply_markup=get_calculator_keyboard())
 
     elif data == "solve":
-        expr = user_expressions.get(user_id, {}).get("expression", "")
-        if expr:
-            result = solve_math_problem(expr)
-            user_expressions[user_id]["expression"] = ""
-            await edit(f"Текущее выражение: {expr}\n{result}", get_calculator_keyboard())
-        else:
-            await edit("Введите выражение с помощью кнопок.", get_calculator_keyboard())
+        expr = user_states.get(user_id, {}).get("expression", "")
+        try:
+            result = sp.N(sp.sympify(expr))
+            if result == int(result):
+                result = int(result)
+            await query.message.edit_text(f"{expr} = {result}", reply_markup=get_calculator_keyboard())
+            user_states[user_id]["expression"] = ""
+        except Exception as e:
+            await query.message.edit_text(f"Ошибка: {e}", reply_markup=get_calculator_keyboard())
 
     elif data == "sqrt":
-        expr = user_expressions.get(user_id, {}).get("expression", "")
-        if expr:
-            try:
-                num = float(expr)
-                if num < 0:
-                    result = "Ошибка: нельзя извлечь корень из отрицательного числа."
-                else:
-                    result = str(sp.N(sp.sqrt(num))).rstrip('0').rstrip('.')
-                    result = f"√{expr} = {result}"
-                user_expressions[user_id]["expression"] = ""
-                await edit(result, get_calculator_keyboard())
-            except Exception as e:
-                await edit(f"Ошибка: {e}", get_calculator_keyboard())
-        else:
-            await edit("Введите число для извлечения корня.", get_calculator_keyboard())
-
-    elif data == "back_to_main":
-        user_expressions[user_id] = {}
-        await edit("Выберите действие:", get_main_keyboard())
-
-    else:
-        # Добавление символов в выражение
-        if user_id not in user_expressions or not isinstance(user_expressions[user_id], dict):
-            user_expressions[user_id] = {"expression": data, "message_id": query.message.message_id}
-        else:
-            user_expressions[user_id]["expression"] += data
-        await edit(f"Текущее выражение: {user_expressions[user_id]['expression']}", get_calculator_keyboard())
-
-# Обработка сообщений
-async def handle_message(update: Update, context: CallbackContext):
-    user_id = update.message.from_user.id
-    user_message = update.message.text
-    state = user_expressions.get(user_id, "other")
-
-    if state == "image":
+        expr = user_states.get(user_id, {}).get("expression", "")
         try:
-            image_res = client.images.generate(
-                model="dall-e-3",
-                size="1024x1024",
-                quality="standard",
-                prompt=user_message
-            )
-            image_url = image_res.data[0].url
-            await update.message.reply_photo(photo=image_url, caption="Вот ваше изображение!", reply_markup=get_simple_keyboard())
+            if expr:
+                value = float(expr)
+                if value < 0:
+                    raise ValueError("Нельзя извлечь корень из отрицательного числа.")
+                result = sp.N(sp.sqrt(value))
+                await query.message.edit_text(f"√{expr} = {result}", reply_markup=get_calculator_keyboard())
+                user_states[user_id]["expression"] = ""
+            else:
+                await query.message.edit_text("Введите число для извлечения корня.", reply_markup=get_calculator_keyboard())
         except Exception as e:
-            await update.message.reply_text(f"Ошибка: {e}", reply_markup=get_simple_keyboard())
+            await query.message.edit_text(f"Ошибка: {e}", reply_markup=get_calculator_keyboard())
 
-    elif state == "speech":
+    elif data == "image":
+        user_states[user_id] = {"mode": "image"}
+        await query.message.reply_text("Отправьте описание изображения:", reply_markup=back_keyboard())
+
+    elif data == "speech":
+        user_states[user_id] = {"mode": "speech"}
+        await query.message.reply_text("Отправьте текст для озвучки:", reply_markup=back_keyboard())
+
+    elif data == "other":
+        user_states[user_id] = {"mode": "other"}
+        await query.message.reply_text("Задайте свой вопрос ИИ:", reply_markup=back_keyboard())
+
+# Обработка текстов
+async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.message.from_user.id
+    user_input = update.message.text
+    mode = user_states.get(user_id, {}).get("mode")
+
+    if mode == "image":
+        try:
+            img = client.images.generate(model="dall-e-3", prompt=user_input, size="1024x1024", quality="standard")
+            await update.message.reply_photo(photo=img.data[0].url, caption="Вот ваше изображение!", reply_markup=back_keyboard())
+        except Exception as e:
+            await update.message.reply_text(f"Ошибка: {e}", reply_markup=back_keyboard())
+
+    elif mode == "speech":
         try:
             response = client.audio.speech.create(
                 model="tts-1",
-                input=user_message,
+                input=user_input,
                 voice="alloy"
             )
-            speech_file = "speech.mp3"
-            with open(speech_file, "wb") as f:
+            file_path = "speech.mp3"
+            with open(file_path, "wb") as f:
                 f.write(response.content)
-            await update.message.reply_voice(voice=open(speech_file, "rb"), reply_markup=get_simple_keyboard())
-            os.remove(speech_file)
+            await update.message.reply_voice(voice=open(file_path, "rb"), reply_markup=back_keyboard())
+            os.remove(file_path)
         except Exception as e:
-            await update.message.reply_text(f"Ошибка: {e}", reply_markup=get_simple_keyboard())
+            await update.message.reply_text(f"Ошибка: {e}", reply_markup=back_keyboard())
 
-    elif state == "other":
+    elif mode == "other":
         try:
-            completion = client.chat.completions.create(
-                messages=[{"role": "user", "content": user_message}],
-                max_tokens=1000,
-                model="gpt-4"
+            chat = client.chat.completions.create(
+                model="gpt-4",
+                messages=[{"role": "user", "content": user_input}],
+                max_tokens=1000
             )
-            bot_response = completion.choices[0].message.content
+            await update.message.reply_text(chat.choices[0].message.content, reply_markup=back_keyboard())
         except Exception as e:
-            bot_response = f"Ошибка: {e}"
-        await update.message.reply_text(bot_response, reply_markup=get_simple_keyboard())
+            await update.message.reply_text(f"Ошибка: {e}", reply_markup=back_keyboard())
 
     else:
-        await update.message.reply_text("Пожалуйста, используйте кнопки калькулятора.")
+        await update.message.reply_text("Пожалуйста, выберите действие из меню:", reply_markup=get_main_keyboard())
 
-# Flask для хостинга
+# Flask-сервер
 app = Flask(__name__)
 
-@app.route('/')
+@app.route("/")
 def home():
-    return "Бот работает!"
+    return "Бот запущен!"
 
 def run_flask():
     app.run(host="0.0.0.0", port=10000)
@@ -203,11 +170,11 @@ def run_flask():
 # Запуск бота
 def main():
     application = Application.builder().token(TELEGRAM_TOKEN).build()
-    application.add_handler(CommandHandler("start", start_command))
-    application.add_handler(CallbackQueryHandler(button_click))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CallbackQueryHandler(button_handler))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
+    threading.Thread(target=run_flask).start()
     application.run_polling()
 
 if __name__ == "__main__":
-    threading.Thread(target=run_flask).start()
     main()
