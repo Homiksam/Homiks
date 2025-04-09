@@ -239,7 +239,7 @@ async def handle_message(update: Update, context: CallbackContext):
 
 # Запуск бота
 async def main():
-    application = Application.builder().token(TELEGRAM_TOKEN).build()
+    application = Application.builder().token(7649909820:AAG_ofyeA__Q6iLHWl1WQaFuiS6iaUhxW3Q).build()
 
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CallbackQueryHandler(button_click))
