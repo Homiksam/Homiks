@@ -36,7 +36,6 @@ def back_keyboard():
 def get_main_menu_button():
     return InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Главное меню", callback_data="back_to_main")]])
 
-# 🔸 Постоянная клавиатура под полем ввода
 def get_persistent_keyboard():
     keyboard = [[KeyboardButton("🏠 Главное меню")]]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
@@ -71,7 +70,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_states[user_id] = {"mode": "math", "expression": ""}
         await query.message.reply_text("Собери выражение с помощью кнопок:", reply_markup=get_calculator_keyboard())
 
-    elif data in "0123456789+-*/":
+    elif data in ("0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "+", "-", "*", "/", "(", ")"):
         if user_states.get(user_id, {}).get("mode") == "math":
             user_states[user_id]["expression"] += data
             await query.message.edit_text(f"Выражение: {user_states[user_id]['expression']}", reply_markup=get_calculator_keyboard())
@@ -84,12 +83,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "solve":
         expr = user_states.get(user_id, {}).get("expression", "")
         try:
-            result = sp.N(sp.sympify(expr))
-            if result == int(result):
-                result = int(result)
+            result = sp.sympify(expr, evaluate=True)
+            evaluated = sp.N(result)
+            if evaluated == int(evaluated):
+                evaluated = int(evaluated)
             else:
-                result = round(float(result), 5)  # округление до 5 знаков
-            await query.message.edit_text(f"{expr} = {result}", reply_markup=get_calculator_keyboard())
+                evaluated = round(float(evaluated), 6)
+            await query.message.edit_text(f"{expr}={evaluated}", reply_markup=get_calculator_keyboard())
             user_states[user_id]["expression"] = ""
         except Exception as e:
             await query.message.edit_text(f"Ошибка: {e}", reply_markup=get_calculator_keyboard())
@@ -105,7 +105,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if result == int(result):
                     result = int(result)
                 else:
-                    result = round(float(result), 5)
+                    result = round(float(result), 6)
                 await query.message.edit_text(f"√{expr} = {result}", reply_markup=get_calculator_keyboard())
                 user_states[user_id]["expression"] = ""
             else:
