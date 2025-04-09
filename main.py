@@ -121,9 +121,16 @@ async def button_click(update: Update, context: CallbackContext):
             reply_markup=get_ai_assistant_keyboard()
         )
 
-    elif query.data == "clear":
-        user_expressions[user_id] = ""
-        await query.message.reply_text("Выражение очищено. Начните заново.", reply_markup=get_calculator_keyboard())
+     elif query.data == "clear":
+        # Проверяем, что словарь у пользователя существует и содержит "expression"
+        if user_id not in user_expressions or not isinstance(user_expressions[user_id], dict):
+            user_expressions[user_id] = {"expression": "", "message_id": query.message.message_id}
+        else:
+            user_expressions[user_id]["expression"] = ""
+        
+        # Обновляем предыдущее сообщение, чтобы сохранить "живые" кнопки
+        await query.message.edit_text("Текущее выражение: ", reply_markup=get_calculator_keyboard())
+
 
     elif query.data == "solve":
         user_expression = user_expressions.get(user_id, "").get("expression", "")
