@@ -87,6 +87,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             result = sp.N(sp.sympify(expr))
             if result == int(result):
                 result = int(result)
+            else:
+                result = round(float(result), 5)  # округление до 5 знаков
             await query.message.edit_text(f"{expr} = {result}", reply_markup=get_calculator_keyboard())
             user_states[user_id]["expression"] = ""
         except Exception as e:
@@ -100,6 +102,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if value < 0:
                     raise ValueError("Нельзя извлечь корень из отрицательного числа.")
                 result = sp.N(sp.sqrt(value))
+                if result == int(result):
+                    result = int(result)
+                else:
+                    result = round(float(result), 5)
                 await query.message.edit_text(f"√{expr} = {result}", reply_markup=get_calculator_keyboard())
                 user_states[user_id]["expression"] = ""
             else:
@@ -124,7 +130,6 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_input = update.message.text
     mode = user_states.get(user_id, {}).get("mode")
 
-    # 🔹 Обработка постоянной кнопки "Главное меню"
     if user_input == "🏠 Главное меню":
         user_states[user_id] = None
         await update.message.reply_text("Вы вернулись в главное меню:", reply_markup=get_main_keyboard())
