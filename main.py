@@ -92,6 +92,7 @@ async def start_command(update: Update, context: CallbackContext):
 
 # Обработчик кнопок
 # Обработчик кнопок
+# Обработчик кнопок
 async def button_click(update: Update, context: CallbackContext):
     query = update.callback_query
     user_id = query.from_user.id
@@ -184,12 +185,27 @@ async def button_click(update: Update, context: CallbackContext):
         # Очищаем состояние пользователя
         user_expressions[user_id] = {}
 
+    elif query.data == "image_back":
+        # Возвращаемся в главное меню после генерации изображения
+        await query.message.edit_text(
+            "Выберите действие:",
+            reply_markup=get_main_keyboard()
+        )
+        user_expressions[user_id] = {}
+
+    elif query.data == "speech_back":
+        # Возвращаемся в главное меню после озвучивания
+        await query.message.edit_text(
+            "Выберите действие:",
+            reply_markup=get_main_keyboard()
+        )
+        user_expressions[user_id] = {}
+
     else:
         # Добавляем введенный символ в текущее выражение пользователя
         user_expressions[user_id]["expression"] += query.data
         # Обновляем текст в том же сообщении
         await query.message.edit_text(f"Текущее выражение: {user_expressions[user_id]['expression']}", reply_markup=get_calculator_keyboard())
-
 
 
 # Обработчик текстовых сообщений
