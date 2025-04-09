@@ -91,6 +91,7 @@ async def start_command(update: Update, context: CallbackContext):
     )
 
 # Обработчик кнопок
+# Обработчик кнопок
 async def button_click(update: Update, context: CallbackContext):
     query = update.callback_query
     user_id = query.from_user.id
@@ -122,12 +123,13 @@ async def button_click(update: Update, context: CallbackContext):
         )
 
     elif query.data == "clear":
+        # Проверяем, что у пользователя уже есть сохранённое выражение
         if user_id not in user_expressions or not isinstance(user_expressions[user_id], dict):
             user_expressions[user_id] = {"expression": "", "message_id": query.message.message_id}
         else:
             user_expressions[user_id]["expression"] = ""
-        
-        # Обновляем предыдущее сообщение, чтобы сохранить "живые" кнопки
+
+        # Очищаем старое сообщение, редактируя его
         await query.message.edit_text("Текущее выражение: ", reply_markup=get_calculator_keyboard())
 
     elif query.data == "solve":
@@ -187,6 +189,7 @@ async def button_click(update: Update, context: CallbackContext):
         user_expressions[user_id]["expression"] += query.data
         # Обновляем текст в том же сообщении
         await query.message.edit_text(f"Текущее выражение: {user_expressions[user_id]['expression']}", reply_markup=get_calculator_keyboard())
+
 
 
 # Обработчик текстовых сообщений
