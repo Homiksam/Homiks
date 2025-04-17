@@ -160,7 +160,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif mode == "other":
         try:
             chat = client.chat.completions.create(
-                model="o1",
+                model="gpt-4o-search-preview",
                 messages=[{"role": "user", "content": user_input}],
                 max_tokens=1000
             )
