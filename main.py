@@ -147,7 +147,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             response = client.audio.speech.create(
                 model="tts-1",
                 input=user_input,
-                voice="alloy"
+                voice="shimmer"
             )
             file_path = "speech.mp3"
             with open(file_path, "wb") as f:
