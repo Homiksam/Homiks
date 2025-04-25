@@ -145,7 +145,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif mode == "speech":
         try:
             response = client.audio.speech.create(
-                model="tts-1",
+                model="gpt-4o-mini-tts",
                 input=user_input,
                 voice="shimmer"
             )
